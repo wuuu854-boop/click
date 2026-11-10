@@ -1202,6 +1202,57 @@ def test_missing_envvar_sequence(runner, envvar, expected):
     assert f"Error: Missing option {expected}." in result.output
 
 
+def test_missing_envvar_from_auto_envvar_prefix(runner):
+    """The hint names the env var derived from ``auto_envvar_prefix``.
+
+    .. versionadded:: 8.6.0
+    """
+    cli = click.Command(
+        "cli",
+        context_settings={"auto_envvar_prefix": "MYAPP"},
+        params=[click.Option(["--port"], type=int, show_envvar=True, required=True)],
+    )
+    result = runner.invoke(cli)
+    assert result.exit_code == 2
+    assert "Error: Missing option '--port' (env var: 'MYAPP_PORT')." in result.output
+
+
+def test_bad_parameter_envvar_from_auto_envvar_prefix(runner):
+    """A bad value names the derived env var as well.
+
+    .. versionadded:: 8.6.0
+    """
+    cli = click.Command(
+        "cli",
+        context_settings={"auto_envvar_prefix": "MYAPP"},
+        params=[click.Option(["--port"], type=int, show_envvar=True)],
+    )
+    result = runner.invoke(cli, ["--port", "not-a-number"])
+    assert result.exit_code == 2
+    assert "'--port' (env var: 'MYAPP_PORT')" in result.output
+
+
+def test_explicit_envvar_wins_over_auto_envvar_prefix(runner):
+    """An explicit ``envvar`` is shown instead of the derived one."""
+    cli = click.Command(
+        "cli",
+        context_settings={"auto_envvar_prefix": "MYAPP"},
+        params=[
+            click.Option(
+                ["--port"],
+                envvar="EXPLICIT_PORT",
+                type=int,
+                show_envvar=True,
+                required=True,
+            )
+        ],
+    )
+    result = runner.invoke(cli)
+    assert result.exit_code == 2
+    assert "(env var: 'EXPLICIT_PORT')" in result.output
+    assert "MYAPP_PORT" not in result.output
+
+
 def test_case_insensitive_choice(runner):
     @click.command()
     @click.option("--foo", type=click.Choice(["Orange", "Apple"], case_sensitive=False))
